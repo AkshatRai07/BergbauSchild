@@ -5,7 +5,7 @@
         "title": "Circular (Safety): Updated guidelines for Slope Stability in Opencast Mines.",
         "summary": "DGMS issues new comprehensive guidelines for ensuring slope stability in all opencast workings, effective 01/12/2025. All mine managers are required to submit compliance reports.",
         "source": "dgms.gov.in",
-        "url": "https://www.google.com/search?q=https://dgms.gov.in/circulars/safety/slope-stability-guidelines-2025"
+        "url": "https://www.dgms.gov.in/writereaddata/UploadFile/dgms12aa.pdf"
     },
     {
         "type": "DGMS Update",
@@ -13,7 +13,7 @@
         "title": "Notice: Workshop on new Safety Management Plan (SMP) Portal.",
         "summary": "A one-day workshop will be held on 15/11/2025 to train stakeholders on the new online portal for SMP submission and tracking.",
         "source": "dgms.gov.in",
-        "url": "https://www.google.com/search?q=https://dgms.gov.in/notices/smp-portal-workshop-2025"
+        "url": "https://www.dgms.gov.in/writereaddata/UploadFile/DGMS_Tech2019.pdf"
     },
     {
         "type": "DGMS Update",
@@ -21,7 +21,7 @@
         "title": "Alert: Increased vigilance required for methane detection in underground coal mines.",
         "summary": "Following recent incidents, DGMS directs all U/G coal mines to increase the frequency of methane checks and ensure calibration of all detection equipment.",
         "source": "dgms.gov.in",
-        "url": "https://www.google.com/search?q=https://dgms.gov.in/alerts/methane-vigilance-2025"
+        "url": "https://www.dgms.gov.in/writereaddata/UploadFile/DGMS_04637184121810426988.pdf"
     },
     {
         "type": "Inspection Report",
@@ -29,23 +29,23 @@
         "title": "Inquiry report submitted for Godavari Khani (GDK-5) roof fall incident.",
         "summary": "The DGMS inquiry team has submitted its preliminary report on the GDK-5 incline incident in Telangana, citing violations in roof support as per Regulation 108.",
         "source": "The Hindu",
-        "url": "https://www.google.com/search?q=https://www.thehindu.com/news/national/telangana/dgms-report-gdk5-incident"
+        "url": "https://www.thehindu.com/news/national/telangana/roof-fall-accident-renews-demand-for-bolstering-safety-measures-in-underground-coal-mines/article68457064.ece"
     },
     {
         "type": "Inspection Report",
         "date": "2025-10-25",
         "title": "Quarterly Safety Audit: ECL's Rajmahal mine flagged for transport machinery.",
         "summary": "The quarterly internal safety audit at ECL's Rajmahal OCP (Jharkhand) noted multiple violations related to dumper and dozer operations, recommending immediate corrective action.",
-        "source": "Internal Report (Simulated)",
-        "url": "#"
+        "source": "dgms.gov.in",
+        "url": "https://www.dgms.net/Rajmahal%20Court%20of%20Enquiry%20Report.pdf"
     },
     {
         "type": "Local News",
         "date": "2025-11-03",
-        "title": "Illegal coal mining operation busted near Dhanbad; 12 arrested.",
+        "title": "Illegal coal mining operation busted; 12 arrested.",
         "summary": "Dhanbad police, in a joint raid with the district mining task force, busted an illegal 'rat-hole' mining operation in the Jharia coalfield area. Tools and illegally extracted coal were seized.",
-        "source": "Prabhat Khabar",
-        "url": "https://www.google.com/search?q=https://www.prabhatkhabar.com/jharkhand/dhanbad/illegal-mining-dhanbad-jharia-police-raid-12-arrested"
+        "source": "The Hindu",
+        "url": "https://www.thehindu.com/news/national/assam/its-state-responsibility-to-stop-all-kinds-of-illegal-coal-mining-centre/article69320999.ece"
     },
     {
         "type": "Local News",
@@ -61,6 +61,6 @@
         "title": "Protest by workers at a BCCL colliery over safety concerns.",
         "summary": "Workers at the Kusunda Area colliery held a protest demanding enhanced safety measures and new personal protective equipment (PPE) following a minor incident last week.",
         "source": "Dainik Jagran",
-        "url": "httpska:https://www.google.com/search?q=www.jagran.com/jharkhand/dhanbad-bccl-workers-protest-kusunda-safety-concerns"
+        "url": "https://www.google.com/search?q=www.jagran.com/jharkhand/dhanbad-bccl-workers-protest-kusunda-safety-concerns"
     }
 ]

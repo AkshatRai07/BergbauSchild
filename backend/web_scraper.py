@@ -6,33 +6,26 @@ import json
 from urllib.parse import urljoin
 from datetime import datetime
 
-# --- Database Imports ---
 import sqlalchemy
 from sqlalchemy import create_engine, Table, Column, String, MetaData, Text, TIMESTAMP, func
 from sqlalchemy.dialects.postgresql import INSERT
 
-# --- AI & Config Imports ---
 from dotenv import load_dotenv
 import google.generativeai as genai
 
-# --- CONFIGURATION ---
 load_dotenv()
 
-# --- Scraper Config ---
 DGMS_URL = "https://dgms.gov.in/"
 NEWS_RSS_URL = "https://news.google.com/rss/search?q=(%22mining%20accident%22%20OR%20%22coal%20mine%22)%20india&hl=en-IN&gl=IN&ceid=IN:en"
 
-# --- Database Config ---
-# Render/Heroku will provide this environment variable
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
     print("Warning: DATABASE_URL not set. Using local SQLite for demo.")
-    DATABASE_URL = "sqlite:///./scraper.db" # Fallback for local testing
+    DATABASE_URL = "sqlite:///./scraper.db"
 
 engine = create_engine(DATABASE_URL)
 metadata = MetaData()
 
-# --- AI Config ---
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 if not GOOGLE_API_KEY:
     raise ValueError("GOOGLE_API_KEY environment variable is not set.")
@@ -51,10 +44,9 @@ safety_settings = [
     {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
 ]
 
-# Initialize the Gemini Model
 try:
     llm = genai.GenerativeModel(
-        model_name="gemini-1.5-flash-latest", # Use Flash for speed/cost
+        model_name="gemini-2.5-pro",
         generation_config=generation_config,
         safety_settings=safety_settings
     )
@@ -63,27 +55,19 @@ except Exception as e:
     print(f"FATAL: Could not initialize Gemini model: {e}")
     llm = None
 
-# --- DATABASE DEFINITION ---
-# This table stores ALL incidents, from scraper or user
-# Your app.py can READ from this table
 incidents_table = Table(
     'incidents',
     metadata,
     Column('id', sqlalchemy.Integer, primary_key=True, autoincrement=True),
-    Column('url', String, unique=True, nullable=False), # URL is the unique key
+    Column('url', String, unique=True, nullable=False),
     Column('title', String, nullable=False),
     Column('source', String),
     Column('seen_at', TIMESTAMP, server_default=func.now()),
-    
-    # --- AI PROCESSED FIELDS ---
-    # The AI will fill these fields.
-    Column('status', String, default='pending'), # 'pending', 'processed', 'error'
+    Column('status', String, default='pending'),
     Column('ai_summary', Text),
-    Column('ai_category', String), # e.g., "Incident Report", "New Regulation", "General News"
-    Column('ai_code', String)      # e.g., "1.1" (from your codes.json logic)
+    Column('ai_category', String),
+    Column('ai_code', String)
 )
-
-# --- DATABASE FUNCTIONS ---
 
 def init_db():
     """Initializes the database tables."""
@@ -105,15 +89,11 @@ def log_incident(conn, url: str, title: str, source: str, ai_result: dict):
         ai_code=ai_result.get("code")
     )
     
-    # This ensures we don't crash if we scrape the same link twice
-    # It will only insert if the URL is not already in the table
     on_conflict_stmt = insert_stmt.on_conflict_do_nothing(
         index_elements=['url']
     )
     
     conn.execute(on_conflict_stmt)
-
-# --- AI FUNCTION ---
 
 AI_SYSTEM_PROMPT = """
 You are an autonomous AI agent working for the Directorate General of Mines Safety (DGMS), India.
@@ -162,8 +142,7 @@ def analyze_text_with_gemini(text_snippet: str, title: str) -> dict:
     
     try:
         response = llm.generate_content([AI_SYSTEM_PROMPT, prompt])
-        
-        # Clean the response and parse JSON
+
         json_text = response.text.strip().lstrip("```json").rstrip("```")
         ai_data = json.loads(json_text)
         
@@ -179,8 +158,6 @@ def analyze_text_with_gemini(text_snippet: str, title: str) -> dict:
             "code": "N/A"
         }
 
-# --- SCRAPER FUNCTIONS (Now with AI) ---
-
 def scrape_dgms(conn):
     """
     Scrapes DGMS, analyzes new items with AI, and logs to DB.
@@ -193,7 +170,6 @@ def scrape_dgms(conn):
         r.raise_for_status()
         soup = BeautifulSoup(r.text, 'html.parser')
 
-        # Find the 'What's New' list (this selector is a guess)
         for item in soup.select(".whatsnew-list li a"): 
             title = item.text.strip()
             relative_url = item.get('href')
@@ -201,13 +177,10 @@ def scrape_dgms(conn):
                 continue
             
             absolute_url = urljoin(DGMS_URL, relative_url)
-            
-            # --- AI PROCESSING STEP ---
-            # We use the title as the "content" since that's all we have
+
             print(f"  [DGMS] Analyzing: {title[:50]}...")
             ai_result = analyze_text_with_gemini(text_snippet=title, title=title)
-            
-            # Log to DB (the function handles duplicates)
+
             log_incident(conn, absolute_url, title, "DGMS", ai_result)
             processed_count += 1
 
@@ -228,14 +201,11 @@ def scrape_google_news(conn):
         for entry in feed.entries:
             title = entry.title
             link = entry.link
-            # Use the RSS summary as our content snippet
             content_snippet = entry.summary 
-            
-            # --- AI PROCESSING STEP ---
+
             print(f"  [News] Analyzing: {title[:50]}...")
             ai_result = analyze_text_with_gemini(text_snippet=content_snippet, title=title)
-            
-            # Log to DB (the function handles duplicates)
+
             log_incident(conn, link, title, "Google News", ai_result)
             processed_count += 1
             
@@ -244,30 +214,22 @@ def scrape_google_news(conn):
     
     print(f"Google News scrape complete. Analyzed {processed_count} items.")
 
-
-# --- MAIN JOB FUNCTION ---
-
 def check_for_updates():
     """
     The main function for the Cron Job.
     It scrapes sources, analyzes them with AI, and writes to the database.
     """
     print(f"\n--- [{datetime.now()}] Running autonomous check for updates ---")
-    
-    # Establish a single connection for this job run
+
     with engine.connect() as conn:
-        # Run all scrapes within a transaction
         with conn.begin():
             scrape_dgms(conn)
             scrape_google_news(conn)
     
     print("--- Autonomous check finished ---")
 
-# --- Direct execution (for testing and for the cron job) ---
 if __name__ == "__main__":
     print("Running scraper job...")
-    # Init the DB (safe to run, 'CREATE TABLE IF NOT EXISTS')
     init_db()
-    # Run the check
     check_for_updates()
     print("Scraper job finished.")
