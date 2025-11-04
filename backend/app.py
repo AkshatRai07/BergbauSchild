@@ -37,6 +37,7 @@ warnings.filterwarnings('ignore')
 
 CSV_PATH = "mining_accidents.csv"
 CODES_JSON_PATH = "mining_accidents_codes.json"
+UPDATES_JSON_PATH = "updates.json"
 VECTOR_INDEX_PATH = "mining_safety_index"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
@@ -469,6 +470,21 @@ def classify_accident(query: ClassificationQuery):
         raise HTTPException(status_code=503, detail="Classifier is not available.")
     
     return classifier.predict(query.description)
+
+@app.get("/updates")
+def get_recent_updates():
+    """
+    Fetches the list of recent updates from the 'updates.json' file.
+    """
+    try:
+        with open(UPDATES_JSON_PATH, 'r') as f:
+            updates_data = json.load(f)
+        return sorted(updates_data, key=lambda x: x.get('date', '1970-01-01'), reverse=True)
+    
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"{UPDATES_JSON_PATH} file not found.")
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail=f"Error decoding {UPDATES_JSON_PATH}.")
 
 @app.post("/chat_stream")
 async def chat_with_agent(query: ChatQuery):
