@@ -2,11 +2,9 @@ from dotenv import load_dotenv
 import os
 import json
 import pandas as pd
-import numpy as np
 import warnings
-import asyncio
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -25,8 +23,6 @@ from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_google_genai.chat_models import ChatGoogleGenerativeAI
 from langchain_core.documents import Document
-from langchain_classic.chains.combine_documents.stuff import create_stuff_documents_chain
-from langchain_classic.chains.retrieval import create_retrieval_chain
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
