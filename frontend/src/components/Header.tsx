@@ -18,8 +18,7 @@ export default function Header() {
     <header className="sticky top-0 z-50 w-full border-b border-gray-700 bg-gray-900/80 backdrop-blur-md">
       <nav className="mx-auto flex max-w-7xl items-center justify-between p-4">
         <div className="flex items-center gap-2">
-          <span className="text-xl font-bold text-cyan-400">⛏️</span>
-          <span className="font-semibold text-white">MineSafe AI</span>
+          <span className="text-xl font-bold text-cyan-400">BergbauSchild ⚒️🛡️</span>
         </div>
         <div className="flex gap-4">
           {navItems.map((item) => (

@@ -1,7 +1,6 @@
 import { getStatistics } from '@/lib/api';
 import { Statistics } from '@/lib/types';
 
-// Helper component for the dashboard
 function StatCard({ title, value }: { title: string; value: string | number }) {
   return (
     <div className="rounded-lg border border-gray-700 bg-gray-800 p-5 shadow-lg">

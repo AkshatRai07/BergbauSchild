@@ -115,40 +115,44 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-100px)] flex-col">
-      <h1 className="mb-4 text-3xl font-bold text-white">Digital Mine Safety Officer</h1>
-      
-      {/* Chat Messages Area */}
-      <div className="grow space-y-4 overflow-y-auto rounded-lg border border-gray-700 bg-gray-800 p-4">
-        {messages.length === 0 && (
-          <div className="flex h-full items-center justify-center">
-            <p className="text-gray-400">Ask me anything about Indian mine safety...</p>
-          </div>
-        )}
-        {messages.map((msg) => (
-          <ChatBubble key={msg.id} message={msg} />
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
+    <div className='flex justify-center'>
+    <div className='w-[85%] my-6'>
+        <div className="flex h-[calc(100vh-100px)] flex-col">
+        <h1 className="mb-4 text-3xl font-bold text-white">Digital Mine Safety Officer</h1>
+        
+        {/* Chat Messages Area */}
+        <div className="grow space-y-4 overflow-y-auto rounded-lg border border-gray-700 bg-gray-800 p-4">
+            {messages.length === 0 && (
+            <div className="flex h-full items-center justify-center">
+                <p className="text-gray-400">Ask me anything about Indian mine safety...</p>
+            </div>
+            )}
+            {messages.map((msg) => (
+            <ChatBubble key={msg.id} message={msg} />
+            ))}
+            <div ref={messagesEndRef} />
+        </div>
 
-      {/* Input Form */}
-      <form onSubmit={handleSubmit} className="mt-4 flex gap-2">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask about an accident, get statistics, or classify a new report..."
-          className="grow rounded-lg border border-gray-600 bg-gray-700 px-4 py-2 text-white placeholder-gray-400 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
-          disabled={isLoading}
-        />
-        <button
-          type="submit"
-          className="rounded-lg bg-cyan-600 px-5 py-2 font-semibold text-white transition-colors hover:bg-cyan-500 disabled:cursor-not-allowed disabled:bg-gray-600"
-          disabled={isLoading}
-        >
-          {isLoading ? 'Thinking...' : 'Send'}
-        </button>
-      </form>
+        {/* Input Form */}
+        <form onSubmit={handleSubmit} className="mt-4 flex gap-2">
+            <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask about an accident, get statistics, or classify a new report..."
+            className="grow rounded-lg border border-gray-600 bg-gray-700 px-4 py-2 text-white placeholder-gray-400 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+            disabled={isLoading}
+            />
+            <button
+            type="submit"
+            className="rounded-lg bg-cyan-600 px-5 py-2 font-semibold text-white transition-colors hover:bg-cyan-500 disabled:cursor-not-allowed disabled:bg-gray-600"
+            disabled={isLoading}
+            >
+            {isLoading ? 'Thinking...' : 'Send'}
+            </button>
+        </form>
+        </div>
+    </div>
     </div>
   );
 }

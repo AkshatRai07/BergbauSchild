@@ -13,7 +13,7 @@ from pydantic import BaseModel as LangchainBaseModel, Field
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 
-from langchain_classic.tools import Tool
+from langchain_classic.tools import Tool, StructuredTool
 from langchain_classic.tools.retriever import create_retriever_tool
 from langchain_classic.agents import create_tool_calling_agent, AgentExecutor
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -222,7 +222,7 @@ class AccidentClassifier:
         
         self.pipeline = Pipeline([
             ('tfidf', TfidfVectorizer(stop_words='english', max_features=1000)),
-            ('clf', LogisticRegression(solver='liblinear', multi_class='auto'))
+            ('clf', LogisticRegression(solver='liblinear', multi_class='auto', class_weight='balanced'))
         ])
         
         try:
@@ -307,6 +307,17 @@ END OF REPORT
 {'='*80}
 """
         return report
+    
+def get_stats_tool(tool_input: Dict = {}) -> Dict[str, Any]:
+    """
+    Wrapper for get_statistics to handle the agent's
+    unwanted inputs. It explicitly accepts a dictionary 
+    (which the agent sends) and ignores it, then 
+    calls the real function.
+    """
+    # This print statement is for debugging, you can remove it later
+    print(f"DEBUG: get_stats_tool was called with input: {tool_input}")
+    return db.get_statistics()
 
 app = FastAPI(
     title="Mining Safety AI Backend",
@@ -348,7 +359,7 @@ def startup_event():
             print("FATAL ERROR: GOOGLE_API_KEY environment variable not set.")
         else:
             llm = ChatGoogleGenerativeAI(
-                model="gemini-2.5-pro",
+                model="gemini-2.5-flash",
                 temperature=0.1,
                 google_api_key=api_key
             )
@@ -374,18 +385,18 @@ def startup_event():
                 "search_accident_reports",
                 "Use this tool to answer specific questions about *past* mining accidents. Input should be a query like 'what happened in the Godavari accident?' or 'show me incidents related to methane'."
             ),
-            Tool(
+            StructuredTool.from_function(
                 name="classify_new_accident",
                 description="Use this tool to classify a *new* accident description and find its official accident code. The input must be the full description of the accident.",
                 func=classifier.predict,
                 args_schema=ClassifyInput
             ),
-            Tool(
+            StructuredTool.from_function(
                 name="get_safety_statistics",
-                description="Use this tool to get high-level dashboard statistics, like total deaths, number of accidents, or breakdowns by state and category.",
-                func=db.get_statistics,
+                description="Use this tool to get high-level dashboard statistics, like total deaths, number of accidents, or breakdowns by state and category. This tool takes no input.",
+                func=db.get_statistics
             ),
-            Tool(
+            StructuredTool.from_function(
                 name="generate_safety_audit_report",
                 description="Use this tool to generate a full, text-based safety audit report. You can optionally filter by year or state.",
                 func=reporter.create_safety_report,
@@ -397,22 +408,21 @@ def startup_event():
 You are an expert "Digital Mine Safety Officer" for India. Your duty is to provide
 helpful, accurate, and concise answers to the user.
 
-You have access to several tools to perform different tasks:
+You have access to several tools to perform tasks on a *specific* database of Indian mining accidents:
 1. `search_accident_reports`: For answering questions about specific *past* accidents in the database.
-2. `get_safety_statistics`: For providing *overall* statistics.
+2. `get_safety_statistics`: For providing *overall* statistics from the database.
 3. `classify_new_accident`: For analyzing a *new* accident description provided by the user.
-4. `generate_safety_audit_report`: For creating a *full* summary report.
+4. `generate_safety_audit_report`: For creating a *full* summary report from the database.
 
 Think step-by-step.
 - First, understand the user's request.
-- Second, decide if you need one or more tools to answer.
-- Third, call the tools with the correct inputs.
-- Finally, combine the tool outputs into a single, comprehensive answer.
+- Second, decide if the user is asking for *specific data* from the database (e.g., "stats", "report", "what happened at Godavari", "classify this") OR if they are asking a *general safety question* (e.g., "what are some safety tips?").
+- Third, if they ask for specific data, call one or more tools.
+- Fourth, if they ask a *general safety question*, use your own knowledge as a safety expert to answer.
+- Finally, combine all information into a single, comprehensive answer.
 
-If the context from the tools does not contain the answer, state clearly:
-"Based on the provided records, I do not have information on that topic."
-
-Do not make up information. Be professional and safety-focused.
+When answering from your own knowledge, be professional and safety-focused.
+When you use tools and the tools do not find an answer, state clearly that the *records* do not contain that information.
 """
         
         prompt = ChatPromptTemplate.from_messages([
@@ -496,6 +506,7 @@ async def chat_with_agent(query: ChatQuery):
     print(f"Streaming agent query: {query.query}")
     
     async def stream_generator():
+        global chat_history
         full_response_content = ""
         try:
             input_data = {

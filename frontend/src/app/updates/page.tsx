@@ -12,7 +12,7 @@ export default async function UpdatesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 mb-6">
       <h1 className="text-3xl font-bold text-white mt-4 ml-35">DGMS & Safety Updates</h1>
       
       {error && <div className="text-center text-red-400">Error loading updates: {error}</div>}
@@ -24,6 +24,7 @@ export default async function UpdatesPage() {
         {updates.map((update, index) => (
           <a
             key={index}
+            href={update.url}
             target="_blank"
             rel="noopener noreferrer"
             className="block rounded-lg border border-gray-700 bg-gray-800 p-5 shadow-lg transition-all hover:border-cyan-500 hover:bg-gray-700 w-[80%]"
