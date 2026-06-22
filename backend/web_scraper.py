@@ -8,7 +8,7 @@ from datetime import datetime
 
 import sqlalchemy
 from sqlalchemy import create_engine, Table, Column, String, MetaData, Text, TIMESTAMP, func
-from sqlalchemy.dialects.postgresql import INSERT
+from sqlalchemy.exc import IntegrityError
 
 from dotenv import load_dotenv
 import google.generativeai as genai
@@ -77,23 +77,21 @@ def init_db():
 def log_incident(conn, url: str, title: str, source: str, ai_result: dict):
     """
     Logs a fully processed incident to the database.
-    Uses ON CONFLICT DO NOTHING to avoid duplicates based on the 'url' constraint.
+    Silently skips duplicates based on the 'url' unique constraint.
     """
-    insert_stmt = INSERT(incidents_table).values(
-        url=url,
-        title=title,
-        source=source,
-        status=ai_result.get("status", "error"),
-        ai_summary=ai_result.get("summary"),
-        ai_category=ai_result.get("category"),
-        ai_code=ai_result.get("code")
-    )
-    
-    on_conflict_stmt = insert_stmt.on_conflict_do_nothing(
-        index_elements=['url']
-    )
-    
-    conn.execute(on_conflict_stmt)
+    try:
+        stmt = incidents_table.insert().values(
+            url=url,
+            title=title,
+            source=source,
+            status=ai_result.get("status", "error"),
+            ai_summary=ai_result.get("summary"),
+            ai_category=ai_result.get("category"),
+            ai_code=ai_result.get("code")
+        )
+        conn.execute(stmt)
+    except IntegrityError:
+        pass
 
 AI_SYSTEM_PROMPT = """
 You are an autonomous AI agent working for the Directorate General of Mines Safety (DGMS), India.

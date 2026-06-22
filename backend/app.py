@@ -13,7 +13,7 @@ from pydantic import BaseModel as LangchainBaseModel, Field
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 
-from langchain_classic.tools import Tool, StructuredTool
+from langchain_classic.tools import StructuredTool
 from langchain_classic.tools.retriever import create_retriever_tool
 from langchain_classic.agents import create_tool_calling_agent, AgentExecutor
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -136,12 +136,14 @@ class MiningRAGSystem:
             return
         
         print("Building new vectorstore... This may take a moment.")
+        def clean(val) -> str:
+            return str(val) if pd.notna(val) and str(val).strip() not in ('', 'nan') else "Not documented"
+
         documents = []
         for idx, row in self.db.df.iterrows():
             code_desc = self.db.get_code_description(str(row['accident_code']))
-            
-            content = f"""
-Accident ID: {row['accident_id']}
+
+            content = f"""Accident ID: {row['accident_id']}
 Date: {row['date']}
 Mine: {row['mine_name']}
 Owner: {row['owner']}
@@ -150,9 +152,9 @@ Mine Type: {row['mine_type']}
 Deaths: {row['deaths_count']}
 Accident Code: {row['accident_code']} - {code_desc}
 Category: {row['accident_category']}
-Incident Description: {row['incident_description']}
-Root Cause Analysis: {row['root_cause']}
-Regulations Violated: {row['regulations_violated']}
+Incident Description: {clean(row['incident_description'])}
+Root Cause Analysis: {clean(row['root_cause'])}
+Regulations Violated: {clean(row['regulations_violated'])}
 """
             
             metadata = {
@@ -308,16 +310,68 @@ END OF REPORT
 """
         return report
     
-def get_stats_tool(tool_input: Dict = {}) -> Dict[str, Any]:
-    """
-    Wrapper for get_statistics to handle the agent's
-    unwanted inputs. It explicitly accepts a dictionary 
-    (which the agent sends) and ignores it, then 
-    calls the real function.
-    """
-    # This print statement is for debugging, you can remove it later
-    print(f"DEBUG: get_stats_tool was called with input: {tool_input}")
-    return db.get_statistics()
+class TrendMonitor:
+    """Detects anomalies and flagged rising trends from accident data"""
+
+    def __init__(self, database: MiningAccidentDatabase):
+        self.db = database
+
+    def detect_anomalies(self) -> list:
+        if self.db.df.empty:
+            return []
+
+        df = self.db.df.copy()
+        alerts = []
+        total = len(df)
+
+        category_counts = df['accident_category'].value_counts()
+        mean_count = float(category_counts.mean())
+
+        for category, count in category_counts.items():
+            if count > mean_count * 2:
+                severity = "HIGH" if count > mean_count * 3 else "MEDIUM"
+                alerts.append({
+                    "type": "category_spike",
+                    "severity": severity,
+                    "title": f"Elevated rate: {category}",
+                    "category": category,
+                    "count": int(count),
+                    "message": f"{count} recorded incidents ({count / total * 100:.1f}% of total) — well above average ({mean_count:.0f}).",
+                    "recommendation": f"Conduct targeted safety review for {category.lower()} hazards. Ensure compliance with relevant DGMS regulations."
+                })
+
+        state_deaths = df.groupby('state')['deaths_count'].sum().sort_values(ascending=False)
+        mean_deaths = float(state_deaths.mean())
+        for state_name, deaths in state_deaths.items():
+            if deaths > mean_deaths * 1.8:
+                severity = "HIGH" if deaths > mean_deaths * 3 else "MEDIUM"
+                alerts.append({
+                    "type": "geographic_hotspot",
+                    "severity": severity,
+                    "title": f"Fatality hotspot: {state_name}",
+                    "state": state_name,
+                    "deaths": int(deaths),
+                    "message": f"{state_name} accounts for {deaths} fatalities — significantly above the per-state average ({mean_deaths:.0f}).",
+                    "recommendation": f"Prioritize mine inspections in {state_name}. Review recent enforcement actions."
+                })
+
+        mine_deaths = df.groupby('mine_type')['deaths_count'].sum().sort_values(ascending=False)
+        if len(mine_deaths) > 0 and mine_deaths.iloc[0] > 0:
+            top_type = mine_deaths.index[0]
+            top_deaths = int(mine_deaths.iloc[0])
+            alerts.append({
+                "type": "mine_type_risk",
+                "severity": "MEDIUM",
+                "title": f"High-risk mine type: {top_type}",
+                "mine_type": top_type,
+                "deaths": top_deaths,
+                "message": f"{top_type.capitalize()} mines account for the highest fatality count ({top_deaths} deaths).",
+                "recommendation": f"Review and reinforce safety protocols specific to {top_type} mine operations."
+            })
+
+        severity_order = {"HIGH": 2, "MEDIUM": 1, "LOW": 0}
+        return sorted(alerts, key=lambda x: severity_order.get(x["severity"], 0), reverse=True)
+
 
 app = FastAPI(
     title="Mining Safety AI Backend",
@@ -334,7 +388,7 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup_event():
-    global db, rag, classifier, reporter, llm, agent_executor, chat_history
+    global db, rag, classifier, reporter, monitor, llm, agent_executor, chat_history
     
     print("Loading database...")
     db = MiningAccidentDatabase(csv_path=CSV_PATH, codes_json_path=CODES_JSON_PATH)
@@ -347,7 +401,8 @@ def startup_event():
     classifier.train()
     
     reporter = ReportGenerator(database=db)
-    
+    monitor = TrendMonitor(database=db)
+
     chat_history = []
     
     print("Initializing Google Gemini LLM...")
@@ -405,24 +460,24 @@ def startup_event():
         ]
         
         system_prompt = """
-You are an expert "Digital Mine Safety Officer" for India. Your duty is to provide
-helpful, accurate, and concise answers to the user.
+You are an expert "Digital Mine Safety Officer" operating under the Directorate General of Mines Safety (DGMS), India. Your duty is to provide helpful, accurate, and actionable answers.
 
-You have access to several tools to perform tasks on a *specific* database of Indian mining accidents:
-1. `search_accident_reports`: For answering questions about specific *past* accidents in the database.
-2. `get_safety_statistics`: For providing *overall* statistics from the database.
-3. `classify_new_accident`: For analyzing a *new* accident description provided by the user.
-4. `generate_safety_audit_report`: For creating a *full* summary report from the database.
+You have access to a database of Indian mining accidents and four tools:
+1. `search_accident_reports` — Answer questions about *specific past accidents* (e.g., "what happened at Godavari?", "show methane incidents").
+2. `get_safety_statistics` — Provide *overall statistics*: total deaths, breakdowns by state/category/mine type.
+3. `classify_new_accident` — Classify a *new accident description* the user provides and return its DGMS accident code.
+4. `generate_safety_audit_report` — Generate a full audit report, optionally filtered by year or state.
 
-Think step-by-step.
-- First, understand the user's request.
-- Second, decide if the user is asking for *specific data* from the database (e.g., "stats", "report", "what happened at Godavari", "classify this") OR if they are asking a *general safety question* (e.g., "what are some safety tips?").
-- Third, if they ask for specific data, call one or more tools.
-- Fourth, if they ask a *general safety question*, use your own knowledge as a safety expert to answer.
-- Finally, combine all information into a single, comprehensive answer.
+Decision process:
+- If the user asks about specific past accidents or patterns → use `search_accident_reports`.
+- If the user asks for totals, counts, or breakdowns → use `get_safety_statistics`.
+- If the user describes a new incident and wants it classified → use `classify_new_accident`.
+- If the user wants a full report → use `generate_safety_audit_report`.
+- If the user asks a general mining safety question (regulations, best practices) → answer from your expert knowledge without calling tools.
 
-When answering from your own knowledge, be professional and safety-focused.
-When you use tools and the tools do not find an answer, state clearly that the *records* do not contain that information.
+When recommending regulatory actions, always cite the specific DGMS regulation number from the accident record (e.g., "Regulation 112(2)(C) of the Metalliferous Mines Regulations, 1961"). If regulations are noted in the retrieved record, quote them directly.
+
+When a tool finds no matching records, state that clearly rather than guessing.
 """
         
         prompt = ChatPromptTemplate.from_messages([
@@ -465,6 +520,12 @@ async def get_safety_report(year: Optional[int] = None, state: Optional[str] = N
     """Generate a plain-text safety audit report"""
     report = reporter.create_safety_report(year=year, state=state)
     return StreamingResponse(iter([report]), media_type="text/plain")
+
+@app.get("/anomalies")
+def get_anomaly_alerts():
+    """Get detected anomalies and rising trend alerts from accident data"""
+    return monitor.detect_anomalies()
+
 
 @app.post("/classify_new_accident")
 def classify_accident(query: ClassificationQuery):
@@ -513,13 +574,16 @@ async def chat_with_agent(query: ChatQuery):
                 "input": query.query,
                 "chat_history": chat_history
             }
-            
-            async for chunk in agent_executor.astream(input_data):
-                if "output" in chunk:
-                    content = chunk["output"]
-                    yield content
-                    full_response_content += content
-            
+
+            async for event in agent_executor.astream_events(input_data, version="v2"):
+                if event["event"] == "on_chat_model_stream":
+                    chunk = event["data"]["chunk"]
+                    content = chunk.content if hasattr(chunk, "content") else ""
+                    # Skip tool-call deltas — they have empty string content
+                    if isinstance(content, str) and content:
+                        yield content
+                        full_response_content += content
+
         except Exception as e:
             print(f"Error during agent stream: {e}")
             yield f"Error: An error occurred: {e}"
@@ -527,7 +591,7 @@ async def chat_with_agent(query: ChatQuery):
             if full_response_content:
                 chat_history.append(HumanMessage(content=query.query))
                 chat_history.append(AIMessage(content=full_response_content))
-            chat_history = chat_history[-6:] 
+            chat_history = chat_history[-6:]
 
     return StreamingResponse(stream_generator(), media_type="text/plain")
 

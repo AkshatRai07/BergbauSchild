@@ -28,3 +28,16 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
 }
+
+export interface AnomalyAlert {
+  type: string;
+  severity: 'HIGH' | 'MEDIUM' | 'LOW';
+  title: string;
+  message: string;
+  recommendation: string;
+  count?: number;
+  deaths?: number;
+  category?: string;
+  state?: string;
+  mine_type?: string;
+}

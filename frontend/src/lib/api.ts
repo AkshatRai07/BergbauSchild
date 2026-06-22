@@ -1,4 +1,4 @@
-import { Statistics, Update, ClassificationResult } from './types';
+import { Statistics, Update, ClassificationResult, AnomalyAlert } from './types';
 
 // IMPORTANT: Set this to your backend URL
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
@@ -43,6 +43,14 @@ export async function generateReport(year?: string, state?: string): Promise<str
     throw new Error('Failed to generate report');
   }
   return res.text();
+}
+
+export async function getAnomalies(): Promise<AnomalyAlert[]> {
+  const res = await fetch(`${API_BASE_URL}/anomalies`);
+  if (!res.ok) {
+    throw new Error('Failed to fetch anomaly alerts');
+  }
+  return res.json();
 }
 
 // Note: The chat stream fetch logic will be handled directly in the
